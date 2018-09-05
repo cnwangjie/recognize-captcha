@@ -1,42 +1,50 @@
 package main
 
-func main() {
+import (
+	"time"
+	"fmt"
+)
 
-	// 基本函数测试
-	//img := getCaptcha()
-	//saveImage(img, "./raw.png")
-	//img = medianFilterImage(img)
-	//saveImage(img, "./dst.png")
-	//bi := baseHandler(img)
-	//bi = removeArouldBlank(bi)
-	//displayBininaryImage(bi)
+const (
+	testSamplesPath = "/home/wangjie/Gopath/src/rc/sample"
+)
 
-	//sb, err := loadBI("./" + handledSamplePathName + "/0/1")
-	//if err != nil {
-	//	fmt.Println(err)
-	//}
-	//displayBininaryImage(sb.BI())
+func singleTest() {
+	dataset := loadHandledSample()
+	trainSet, testSet := splitDataset(dataset, 0.7)
+	testSetSize := len(testSet.points)
+	correct := 0
+	start := time.Now()
+	fmt.Println("train num:", len(trainSet.points), "test num:", testSetSize)
+	for i := 0; i < testSetSize; i++ {
+		fmt.Println("(", i, "/", testSetSize, ")", correct)
+		if predict(trainSet, testSet.points[i].data) == testSet.points[i].label {
+			correct++
+		}
+	}
+	fmt.Println("correct:", correct, "(", float64(correct) / float64(testSetSize), ")")
+	fmt.Println("time spent:", time.Now().Sub(start).String())
+}
 
-	// 处理样本
-	//handleSample()
-
-	// 训练
-	//probabilityTrain()
-
-	// 验证
-	probalityVerify()
-
-	// 打码获取样本
-	//for i := 0; i < 1E5 ; i += 1 {
-	//	if err := p.DefaultProcess.Open(); err != nil {
-	//		fmt.Println(err)
-	//		os.Exit(1)
-	//	}
-	//	err := catchAnCaptchaAndTest()
-	//	if err != nil {
-	//		fmt.Println(err.Error())
-	//	}
-	//	p.DefaultProcess.Close()
-	//}
-
+func test() {
+	samples := loadSamples(testSamplesPath)
+	dataset := loadHandledSample()
+	correct := 0
+	start := time.Now()
+	fmt.Println("train num:", len(dataset.points), "test num:", len(samples))
+	for i, sample := range samples {
+		bi := createBinaryImage(sample.image)
+		bi = filter(bi)
+		bi4 := split(bi)
+		re := ""
+		for _, bi := range bi4 {
+			re += string(predict(dataset, bi.toString()))
+		}
+		if re == sample.label {
+			correct++
+		}
+		fmt.Println(i, correct)
+	}
+	fmt.Println("correct:", correct, "(", float64(correct) / float64(len(samples)), ")")
+	fmt.Println("time spent:", time.Now().Sub(start).String())
 }

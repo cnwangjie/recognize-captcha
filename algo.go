@@ -1,99 +1,57 @@
 package main
 
-import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"os"
-	"strconv"
-)
-
-var (
-	probDat = map[string][standardSize]float64{}
-)
-
-// 像素匹配度
-func probabilityTrain() {
-	letters, _ := ioutil.ReadDir("./" + handledSamplePathName)
-	result := map[string][standardSize]float64{}
-	for _, v := range letters {
-		letter := v.Name()
-		samples, _ := ioutil.ReadDir("./" + handledSamplePathName + "/" + letter)
-		sum := len(samples)
-		letterRe := [standardSize]float64{}
-		data := make([]StandardBI, sum)
-		for i := 0; i < sum; i += 1 {
-			data[i], _ = loadBI("./" + handledSamplePathName + "/" + letter + "/" + strconv.Itoa(i))
-			displayBininaryImage(data[i].BI())
-			for j := 0; j < standardHeight*standardWidth; j += 1 {
-				if data[i][j] {
-					letterRe[j] += 1
-				}
-			}
-		}
-
-		for j := 0; j < standardSize; j += 1 {
-			letterRe[j] /= float64(sum)
-		}
-		result[letter] = letterRe
-	}
-	file, _ := os.Create("./data/prob.json")
-	defer file.Close()
-	enc := json.NewEncoder(file)
-	enc.Encode(result)
+type point struct {
+	data string
+	label byte
 }
 
-func probabiltyCal(sb StandardBI) (string, float64) {
-	if len(probDat) == 0 {
-		dat, _ := os.Open("./data/prob.json")
-		jsonStr, _ := ioutil.ReadAll(dat)
-		json.Unmarshal([]byte(jsonStr), &probDat)
-	}
-	probability := map[string]float64{}
-	for k, v := range probDat {
-		for i := 0; i < standardSize; i += 1 {
-			if sb[i] {
-				probability[k] += v[i]
-			}
-		}
-	}
-
-	var maxProb = float64(0)
-	maxProbLetter := ""
-	for k, v := range probability {
-		if v > maxProb {
-			maxProbLetter = k
-			maxProb = v
-		}
-	}
-
-	var absoluteProb = float64(0)
-	for _, v := range probDat[maxProbLetter] {
-		absoluteProb += v
-	}
-	return maxProbLetter, maxProb / absoluteProb
+type dataset struct {
+	points []point
+	labelsum int
 }
 
-func probalityVerify() {
-	letters, _ := ioutil.ReadDir("./" + handledSamplePathName)
-	sumInAll := 0
-	correctInAll := 0
-	for _, v := range letters {
-		letter := v.Name()
-		samples, _ := ioutil.ReadDir("./" + handledSamplePathName + "/" + letter)
-		sum := len(samples)
-		for i := 0; i < sum; i += 1 {
-			sb, _ := loadBI("./" + handledSamplePathName + "/" + letter + "/" + strconv.Itoa(i))
-			recgRe, prob := probabiltyCal(sb)
-			sumInAll += 1
-			if recgRe == letter {
-				correctInAll += 1
+func dist(a, b string) float64 {
+	return (100.0 - float64(similarText(a, b))) / 100
+}
+
+func predict(dataset dataset, str string) byte {
+	k := dataset.labelsum + 1
+	labels := make([]byte, k)
+	dists := make([]float64, k)
+	for i := 0; i < k; i++ {
+		dists[i] = 1
+	}
+	l := len(dataset.points)
+	for i := 0; i < l; i++ {
+		d := dist(dataset.points[i].data, str)
+		if d > dists[k - 1] {
+			continue
+		}
+		dists[k - 1] = d
+		labels[k - 1] = dataset.points[i].label
+		for j := k - 1; j > 0; j-- {
+			if dists[j] > dists[j - 1] {
+				break
 			}
-			fmt.Println(letter+":"+recgRe, prob)
+			dists[j], dists[j - 1] = dists[j - 1], dists[j]
+			labels[j], labels[j - 1] = labels[j - 1], labels[j]
 		}
 	}
-
-	fmt.Println("done!")
-	fmt.Println("sum:", sumInAll)
-	fmt.Println("accuracy:", float64(correctInAll)/float64(sumInAll))
+	// sum := make(map[byte]int)
+	// mn := 0
+	// var mb byte
+	// for i := 0; i < k; i++ {
+	// 	_, e := sum[labels[i]]
+	// 	if e {
+	// 		sum[labels[i]]++
+	// 	} else {
+	// 		sum[labels[i]] = 1
+	// 	}
+	// 	if sum[labels[i]] > mn {
+	// 		mn = sum[labels[i]]
+	// 		mb = labels[i]
+	// 	}
+	// }
+	// return mb
+	return labels[0]
 }
